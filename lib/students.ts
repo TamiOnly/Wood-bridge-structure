@@ -202,22 +202,46 @@ export async function getStudentByStudentId(studentId: string): Promise<Student 
 
 // 根据姓名、组名和密码验证登录（仅组长）
 export async function verifyLeaderLogin(name: string, groupName: string, password: string): Promise<Student | null> {
-  const db = getDb()
-  const student = await db.queryOne<Student>(
-    'SELECT * FROM students WHERE name = ? AND groupName = ? AND role = ?',
-    [name, groupName, '组长']
-  )
+  try {
+    const db = getDb()
+    
+    console.log('[verifyLeaderLogin] 查询条件:', { name, groupName, role: '组长' })
+    
+    const student = await db.queryOne<Student>(
+      'SELECT * FROM students WHERE name = ? AND groupName = ? AND role = ?',
+      [name, groupName, '组长']
+    )
 
-  if (!student) {
-    return null
+    if (!student) {
+      console.log('[verifyLeaderLogin] 未找到匹配的学生记录')
+      return null
+    }
+
+    console.log('[verifyLeaderLogin] 找到学生记录:', { 
+      id: student.id, 
+      name: student.name, 
+      groupName: student.groupName,
+      role: student.role,
+      passwordMatch: student.groupPassword === password 
+    })
+
+    // 验证密码
+    if (student.groupPassword !== password) {
+      console.log('[verifyLeaderLogin] 密码不匹配')
+      return null
+    }
+
+    return student
+  } catch (error: any) {
+    console.error('[verifyLeaderLogin] 查询异常:', error)
+    console.error('[verifyLeaderLogin] 错误详情:', {
+      message: error?.message,
+      code: error?.code,
+      sqlState: error?.sqlState,
+      sqlMessage: error?.sqlMessage
+    })
+    throw error
   }
-
-  // 验证密码
-  if (student.groupPassword !== password) {
-    return null
-  }
-
-  return student
 }
 
 // 获取组的所有成员
