@@ -120,5 +120,12 @@ export async function ensureDatabaseInitialized() {
   }
 }
 
-// 为了向后兼容，导出默认的适配器实例
-export default getDb()
+// 为了向后兼容，导出默认的适配器实例（延迟初始化，避免构建时连接数据库）
+// 注意：不要在模块加载时调用 getDb()，应该在需要时才获取
+const dbModule = {
+  getDb,
+  initDatabaseAdapter,
+  ensureDatabaseInitialized
+}
+
+export default dbModule

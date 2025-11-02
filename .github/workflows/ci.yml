@@ -34,6 +34,12 @@ jobs:
     
     - name: Build application
       run: npm run build
+      env:
+        # 构建时不需要数据库连接，使用默认值即可
+        DB_TYPE: sqlite
+        # Coze API 变量可选，构建时不需要
+        COZE_API_KEY: ${{ secrets.COZE_API_KEY }}
+        COZE_BOT_ID: ${{ secrets.COZE_BOT_ID }}
     
     - name: Run tests
       run: npm test --if-present
@@ -41,12 +47,15 @@ jobs:
   deploy:
     needs: test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # 只有在配置了 Vercel secrets 时才执行部署
+    continue-on-error: true
     
     steps:
     - uses: actions/checkout@v3
     
     - name: Deploy to Vercel
+      if: ${{ secrets.VERCEL_TOKEN != '' && secrets.ORG_ID != '' && secrets.PROJECT_ID != '' }}
       uses: amondnet/vercel-action@v20
       with:
         vercel-token: ${{ secrets.VERCEL_TOKEN }}
