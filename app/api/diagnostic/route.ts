@@ -28,12 +28,33 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(diagnostics, { status: 500 })
     }
 
-    // 检查2: 数据库类型
-    const dbType = process.env.DB_TYPE || 'sqlite'
+    // 检查2: 数据库类型（检查实际使用的类型）
+    const db = getDb()
+    const actualDbType = process.env.DB_TYPE || 'sqlite'
+    
+    // 检查实际使用的数据库类型
+    let actualType = actualDbType
+    try {
+      // 尝试执行 MySQL 特有的查询来检测实际类型
+      const testQuery = await db.queryOne<any>("SELECT VERSION() as version")
+      if (testQuery?.version) {
+        actualType = 'mysql'
+      }
+    } catch (e) {
+      // 如果失败，可能是 SQLite
+      actualType = 'sqlite'
+    }
+    
     diagnostics.checks.databaseType = {
-      status: 'ok',
-      type: dbType,
-      message: `当前使用: ${dbType.toUpperCase()}`
+      status: actualType === 'mysql' ? 'ok' : 'warning',
+      environmentVariable: actualDbType,
+      actualType: actualType,
+      message: actualDbType !== 'mysql' 
+        ? `⚠️ 环境变量 DB_TYPE=${actualDbType}，但实际使用: ${actualType.toUpperCase()}。请检查 Vercel 环境变量配置！`
+        : `✅ 当前使用: ${actualType.toUpperCase()}`,
+      warning: actualDbType === 'sqlite' && process.env.VERCEL 
+        ? '生产环境不应使用 SQLite！请在 Vercel 环境变量中设置 DB_TYPE=mysql'
+        : undefined
     }
 
     // 检查3: 表是否存在
@@ -113,15 +134,26 @@ export async function GET(request: NextRequest) {
     }
 
     // 检查6: 环境变量
+    const dbTypeEnv = process.env.DB_TYPE
+    const isVercel = !!process.env.VERCEL
+    
     diagnostics.checks.environment = {
-      status: 'info',
-      dbType: process.env.DB_TYPE || '未设置（默认sqlite）',
-      dbHost: process.env.DB_HOST || '未设置',
-      dbName: process.env.DB_NAME || '未设置',
+      status: dbTypeEnv === 'mysql' ? 'ok' : (isVercel ? 'error' : 'warning'),
+      isVercel: isVercel,
+      dbType: dbTypeEnv || '❌ 未设置（默认使用sqlite，生产环境错误！）',
+      dbHost: process.env.DB_HOST || '❌ 未设置',
+      dbName: process.env.DB_NAME || '❌ 未设置',
       hasDbUser: !!process.env.DB_USER,
       hasDbPassword: !!process.env.DB_PASSWORD,
       hasCozeApiKey: !!process.env.COZE_API_KEY,
-      hasCozeBotId: !!process.env.COZE_BOT_ID
+      hasCozeBotId: !!process.env.COZE_BOT_ID,
+      message: !dbTypeEnv && isVercel
+        ? '❌ 严重错误：Vercel 环境中 DB_TYPE 未设置！请立即在 Vercel 项目设置中添加环境变量 DB_TYPE=mysql'
+        : dbTypeEnv === 'sqlite' && isVercel
+        ? '❌ 严重错误：Vercel 不能使用 SQLite！请将 DB_TYPE 改为 mysql'
+        : dbTypeEnv === 'mysql' && (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_PASSWORD)
+        ? '⚠️ DB_TYPE=mysql 但缺少必要的 MySQL 配置（DB_HOST, DB_USER, DB_PASSWORD）'
+        : '✅ 环境变量配置正常'
     }
 
     if (diagnostics.status === 'checking') {
