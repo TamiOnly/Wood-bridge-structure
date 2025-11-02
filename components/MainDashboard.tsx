@@ -58,7 +58,11 @@ export default function MainDashboard() {
                 <User className="w-4 h-4" />
                 <span>{user?.name}</span>
                 <span className="text-gray-400">|</span>
-                <span>{user?.class}</span>
+                <span>{user?.grade}</span>
+                <span className="text-gray-400">|</span>
+                <span>{user?.groupName}</span>
+                <span className="text-gray-400">|</span>
+                <span className="text-primary-600 font-medium">{user?.role}</span>
               </div>
               
               <button

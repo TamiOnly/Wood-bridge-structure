@@ -9,10 +9,11 @@ import { useAppStore } from '@/lib/store'
 export default function LoginForm() {
   const [formData, setFormData] = useState({
     name: '',
-    class: '',
-    studentId: '',
+    groupName: '',
+    password: '',
   })
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
   
   const { setUser } = useAppStore()
   const router = useRouter()
@@ -20,30 +21,52 @@ export default function LoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError('')
 
-    // 模拟登录验证
-    if (!formData.name || !formData.class || !formData.studentId) {
-      alert('请填写完整信息')
+    // 验证必填字段
+    if (!formData.name || !formData.groupName || !formData.password) {
+      setError('请填写完整信息（姓名、组名、密码）')
       setIsLoading(false)
       return
     }
 
     try {
-      // 模拟API调用
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      const user = {
-        id: Date.now().toString(),
-        name: formData.name,
-        class: formData.class,
-        studentId: formData.studentId,
+      // 调用登录API
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          groupName: formData.groupName,
+          password: formData.password,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || '登录失败，请重试')
+        setIsLoading(false)
+        return
       }
-      
-      setUser(user)
-      alert(`欢迎回来，${formData.name}！`)
-      router.push('/dashboard')
+
+      if (data.success && data.student) {
+        // 转换数据库ID为字符串
+        const user = {
+          ...data.student,
+          id: data.student.id.toString(),
+        }
+        
+        setUser(user)
+        router.push('/dashboard')
+      } else {
+        setError('登录失败，请重试')
+      }
     } catch (error) {
-      alert('登录失败，请重试')
+      console.error('Login error:', error)
+      setError('登录时发生错误，请稍后重试')
     } finally {
       setIsLoading(false)
     }
@@ -54,6 +77,21 @@ export default function LoginForm() {
       ...prev,
       [e.target.name]: e.target.value
     }))
+    // 清除错误信息
+    if (error) {
+      setError('')
+    }
+  }
+
+  // 防止在输入框中按回车键时意外提交表单
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      // 只有在所有字段都填写完整时才允许回车提交
+      if (!formData.name || !formData.groupName || !formData.password) {
+        e.preventDefault()
+        setError('请填写完整信息（姓名、组名、密码）')
+      }
+    }
   }
 
   return (
@@ -62,9 +100,15 @@ export default function LoginForm() {
         <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-100 rounded-full mb-4">
           <span className="text-3xl">🎓</span>
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">学生登录</h2>
-        <p className="text-gray-600">请输入您的学习信息</p>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">组长登录</h2>
+        <p className="text-gray-600">仅组长可登录，请输入您的登录信息</p>
       </div>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          {error}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -79,6 +123,7 @@ export default function LoginForm() {
               name="name"
               value={formData.name}
               onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
               className="input-field pl-10"
               placeholder="请输入您的姓名"
               required
@@ -87,38 +132,43 @@ export default function LoginForm() {
         </div>
 
         <div>
-          <label htmlFor="class" className="block text-sm font-medium text-gray-700 mb-2">
-            班级
+          <label htmlFor="groupName" className="block text-sm font-medium text-gray-700 mb-2">
+            组名
           </label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">📚</span>
+            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">👥</span>
             <input
               type="text"
-              id="class"
-              name="class"
-              value={formData.class}
+              id="groupName"
+              name="groupName"
+              value={formData.groupName}
               onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
               className="input-field pl-10"
-              placeholder="例如：高一(1)班"
+              placeholder="请输入您的小组名称"
               required
             />
           </div>
         </div>
 
         <div>
-          <label htmlFor="studentId" className="block text-sm font-medium text-gray-700 mb-2">
-            学号
+          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+            小组密码
           </label>
-          <input
-            type="text"
-            id="studentId"
-            name="studentId"
-            value={formData.studentId}
-            onChange={handleInputChange}
-            className="input-field"
-            placeholder="请输入您的学号"
-            required
-          />
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔒</span>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              value={formData.password}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              className="input-field pl-10"
+              placeholder="请输入小组密码"
+              required
+            />
+          </div>
         </div>
 
         <button
@@ -132,7 +182,7 @@ export default function LoginForm() {
 
       <div className="mt-6 text-center">
         <p className="text-sm text-gray-500">
-          登录即表示您同意使用本学习平台
+          仅组长可以登录此系统
         </p>
       </div>
     </div>

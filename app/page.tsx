@@ -6,15 +6,21 @@ import { useAppStore } from '@/lib/store'
 import LoginForm from '@/components/LoginForm'
 
 export default function Home() {
-  const { isLoggedIn } = useAppStore()
+  const { isLoggedIn, user } = useAppStore()
   const router = useRouter()
 
   useEffect(() => {
-    // 检查登录状态
-    if (isLoggedIn) {
-      router.push('/dashboard')
+    // 检查登录状态，同时验证用户数据是否完整（防止旧数据导致自动跳转）
+    if (isLoggedIn && user) {
+      // 验证用户数据完整性（新的数据结构需要包含这些字段）
+      if (user.name && user.groupName && user.grade && user.role === '组长') {
+        router.push('/dashboard')
+      } else {
+        // 如果用户数据不完整，清除登录状态
+        useAppStore.getState().logout()
+      }
     }
-  }, [isLoggedIn, router])
+  }, [isLoggedIn, user, router])
 
   return (
     <div className="min-h-screen gradient-bg">

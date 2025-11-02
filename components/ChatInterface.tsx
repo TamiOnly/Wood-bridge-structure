@@ -573,13 +573,22 @@ export default function ChatInterface() {
     setIsTyping(true)
 
     try {
-      // 调用AI API
+      // 调用AI API，传递历史消息以支持上下文对话
+      // 只传递最近的对话历史（最多10轮）以避免请求过大
+      const recentHistory = chatMessages.slice(-10).map(msg => ({
+        content: msg.content,
+        isUser: msg.isUser,
+      }))
+      
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: currentMessage }),
+        body: JSON.stringify({ 
+          message: currentMessage,
+          history: recentHistory,
+        }),
       })
 
       if (!response.ok) {

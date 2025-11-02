@@ -112,3 +112,9 @@ coverage/
 
 # 本地开发文件
 *.local
+
+# 数据库文件
+data/
+*.db
+*.db-shm
+*.db-wal

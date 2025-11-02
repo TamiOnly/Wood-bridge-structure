@@ -4,8 +4,11 @@ import { persist } from 'zustand/middleware'
 export interface User {
   id: string
   name: string
-  class: string
+  grade: string
   studentId: string
+  gender: '男' | '女'
+  role: '组长' | '组员'
+  groupName: string
   avatar?: string
 }
 

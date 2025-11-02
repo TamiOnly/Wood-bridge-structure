@@ -2,51 +2,281 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
-    const { message } = await request.json()
+    const { message: userMessage, history } = await request.json()
     
-    if (!message) {
+    if (!userMessage) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 })
     }
 
-    // 使用免费的AI API服务 - 这里使用一个通用的AI服务
-    // 您可以根据需要替换为其他AI服务（如OpenAI、Claude等）
+    // 方案1：使用扣子（Coze）智能体服务
+    const cozeApiKey = process.env.COZE_API_KEY
+    const cozeBotId = process.env.COZE_BOT_ID
     
-    // 方案1：使用免费的AI服务（需要注册获取API key）
-    // const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    //   method: 'POST',
-    //   headers: {
-    //     'Authorization': 'Bearer YOUR_API_KEY',
-    //     'Content-Type': 'application/json',
-    //   },
-    //   body: JSON.stringify({
-    //     model: 'gpt-3.5-turbo',
-    //     messages: [
-    //       {
-    //         role: 'system',
-    //         content: '你是一个专业的桥梁工程学习助手，专门帮助学生学习桥梁设计、结构力学和材料科学。请用中文回答，语言要专业但易懂。'
-    //       },
-    //       {
-    //         role: 'user',
-    //         content: message
-    //       }
-    //     ],
-    //     max_tokens: 500,
-    //     temperature: 0.7,
-    //   })
-    // })
+    if (!cozeApiKey || !cozeBotId) {
+      // 如果没有配置API key，使用本地增强的智能回答系统作为fallback
+      console.warn('COZE_API_KEY or COZE_BOT_ID not configured, using local AI response system')
+      const aiResponse = getEnhancedAIResponse(userMessage)
+      return NextResponse.json({ response: aiResponse })
+    }
 
-    // 方案2：使用本地增强的智能回答系统
-    const aiResponse = getEnhancedAIResponse(message)
+    try {
+      console.log('[Coze API] ===========================================')
+      console.log('[Coze API] 开始调用扣子智能体')
+      console.log('[Coze API] Bot ID:', cozeBotId)
+      console.log('[Coze API] 用户消息:', userMessage)
+      console.log('[Coze API] ===========================================')
+      
+      // 扣子（Coze）API 调用方式：使用 v3/chat 端点（根据官方文档）
+      // 端点: https://api.coze.cn/v3/chat
+      // 支持添加上下文和流式响应
+      // 文档: https://www.coze.cn/docs/developer_guides/api_overview
+      
+      // 使用固定的用户ID（基于当前会话，保持上下文连续性）
+      // 如果需要支持多用户，可以从请求中获取用户ID
+      const userId = `user_session_${Date.now()}`
+      console.log('[Coze API] 用户ID:', userId)
+      
+      // 构建 additional_messages，包含历史对话和当前消息
+      // 根据文档，每次请求都带上历史消息，实现上下文多轮对话
+      const additionalMessages: any[] = []
+      
+      // 添加历史消息（如果有）
+      if (history && Array.isArray(history) && history.length > 0) {
+        console.log('[Coze API] 添加历史消息，数量:', history.length)
+        for (const msg of history) {
+          if (msg.isUser) {
+            // 用户消息
+            additionalMessages.push({
+              content: msg.content,
+              content_type: 'text',
+              role: 'user',
+              type: 'question'
+            })
+          } else {
+            // AI助手消息
+            additionalMessages.push({
+              content: msg.content,
+              content_type: 'text',
+              role: 'assistant',
+              type: 'answer'
+            })
+          }
+        }
+      }
+      
+      // 添加当前用户消息
+      additionalMessages.push({
+        content: userMessage,
+        content_type: 'text',
+        role: 'user',
+        type: 'question'
+      })
+      
+      // 构建请求体（根据官方文档格式）
+      // 使用流式响应以获得更好的体验
+      const requestBody = {
+        bot_id: cozeBotId,
+        user_id: userId,
+        stream: true, // 使用流式响应
+        additional_messages: additionalMessages,
+        parameters: {}
+      }
+      
+      console.log('[Coze API] 请求体:', JSON.stringify(requestBody, null, 2))
+      
+      const chatResponse = await fetch('https://api.coze.cn/v3/chat', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${cozeApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      })
+      
+      console.log('[Coze API] 响应状态:', chatResponse.status, chatResponse.statusText)
+      console.log('[Coze API] 响应头:', Object.fromEntries(chatResponse.headers.entries()))
+      
+      if (!chatResponse.ok) {
+        const errorText = await chatResponse.text()
+        console.error('[Coze API] ❌ 发送消息失败')
+        console.error('[Coze API] 错误响应状态:', chatResponse.status)
+        console.error('[Coze API] 错误响应内容:', errorText)
+        let errorData: any = {}
+        try {
+          errorData = JSON.parse(errorText)
+          console.error('[Coze API] ❌ 解析后的错误数据:', JSON.stringify(errorData, null, 2))
+        } catch (e) {
+          console.error('[Coze API] ❌ 解析错误响应失败:', e)
+        }
+        throw new Error(`扣子API调用失败: ${chatResponse.status} ${errorData.msg || errorData.message || errorText}`)
+      }
+      
+      // 解析响应数据（流式响应）
+      const contentType = chatResponse.headers.get('content-type') || ''
+      let aiResponse = ''
+      
+      if (contentType.includes('text/event-stream')) {
+        // 处理SSE流式响应
+        console.log('[Coze API] 处理流式响应...')
+        const reader = chatResponse.body?.getReader()
+        const decoder = new TextDecoder()
+        
+        if (!reader) {
+          throw new Error('无法读取响应流')
+        }
+        
+        let currentEventType = ''
+        let lastCompletedMessage: any = null
+        let buffer = '' // 用于处理跨行的数据
+        
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          
+          const chunk = decoder.decode(value, { stream: true })
+          buffer += chunk
+          const lines = buffer.split('\n')
+          // 保留最后一个不完整的行在buffer中
+          buffer = lines.pop() || ''
+          
+          for (const line of lines) {
+            const trimmedLine = line.trim()
+            if (!trimmedLine) continue
+            
+            if (trimmedLine.startsWith('event:')) {
+              currentEventType = trimmedLine.substring(6).trim()
+              console.log('[Coze API] 事件类型:', currentEventType)
+            } else if (trimmedLine.startsWith('data:')) {
+              try {
+                const dataStr = trimmedLine.substring(5).trim()
+                if (dataStr === '[DONE]') {
+                  console.log('[Coze API] 收到 [DONE] 标记')
+                  continue
+                }
+                
+                const eventData = JSON.parse(dataStr)
+                
+                // 使用SSE的event类型来判断，而不是eventData.event
+                // 处理增量内容
+                if (currentEventType === 'conversation.message.delta') {
+                  if (eventData.content) {
+                    aiResponse += eventData.content
+                    console.log('[Coze API] 增量内容:', eventData.content)
+                  }
+                }
+                
+                // 处理完成的消息
+                if (currentEventType === 'conversation.message.completed') {
+                  if (eventData.role === 'assistant' && eventData.type === 'answer') {
+                    lastCompletedMessage = eventData
+                    // 使用完整的消息内容（比增量拼接更可靠）
+                    if (eventData.content) {
+                      aiResponse = eventData.content
+                      console.log('[Coze API] ✅ 收到完整消息，长度:', eventData.content.length)
+                    }
+                  }
+                }
+                
+                // 处理错误
+                if (currentEventType === 'error') {
+                  console.error('[Coze API] 流式响应错误:', eventData)
+                  throw new Error(`扣子API错误: ${eventData.msg || eventData.message || '未知错误'}`)
+                }
+              } catch (e) {
+                // 忽略单个JSON解析错误（可能是数据不完整）
+                if (e instanceof SyntaxError) {
+                  console.warn('[Coze API] JSON解析失败，可能数据不完整:', e.message)
+                  continue
+                }
+                throw e
+              }
+            }
+          }
+        }
+        
+        // 如果最后有完整的消息，优先使用它
+        if (lastCompletedMessage?.content) {
+          aiResponse = lastCompletedMessage.content
+          console.log('[Coze API] ✅ 从流式响应中提取完整回答，长度:', aiResponse.length)
+        } else if (aiResponse) {
+          console.log('[Coze API] ✅ 从流式响应增量拼接回答，长度:', aiResponse.length)
+        }
+        
+        console.log('[Coze API] 回答预览:', aiResponse.substring(0, 200))
+      } else {
+        // 处理非流式JSON响应
+        const data = await chatResponse.json()
+        console.log('[Coze API] 响应数据完整内容:', JSON.stringify(data, null, 2))
+        
+        // 检查响应状态码（扣子API使用code字段）
+        if (data.code !== 0 && data.code !== undefined) {
+          console.error('[Coze API] ❌ API返回错误')
+          console.error('[Coze API] 错误代码:', data.code)
+          console.error('[Coze API] 错误消息:', data.msg)
+          
+          // 特殊处理：Bot未发布到API频道
+          if (data.code === 4015) {
+            throw new Error('Bot未发布到"Agent As API"频道。请在扣子平台发布Bot后再使用。详情: https://www.coze.cn/docs/guides')
+          }
+          
+          throw new Error(`扣子API错误: ${data.code} - ${data.msg || '未知错误'}`)
+        }
+        
+        console.log('[Coze API] ✅ API调用成功')
+        
+        // 解析非流式响应中的消息
+        if (data.data?.messages && Array.isArray(data.data.messages)) {
+          const assistantMsg = data.data.messages.find((msg: any) => 
+            msg.role === 'assistant' && msg.type === 'answer'
+          )
+          if (assistantMsg?.content) {
+            aiResponse = assistantMsg.content
+            console.log('[Coze API] ✅ 从 data.messages 中提取回答')
+          }
+        } else if (data.data?.content) {
+          aiResponse = data.data.content
+        } else if (data.content) {
+          aiResponse = data.content
+        }
+      }
+      
+      if (!aiResponse || !aiResponse.trim()) {
+        console.warn('[Coze API] ⚠️ 无法从响应中提取回答')
+        aiResponse = '抱歉，无法获取AI回答。请检查Bot是否已正确发布。'
+      }
     
+      console.log('[Coze API] 最终回答长度:', aiResponse.length)
     return NextResponse.json({ response: aiResponse })
+    } catch (apiError: any) {
+      console.error('[Coze API] ❌❌❌ 发生错误 ❌❌❌')
+      console.error('[Coze API] 错误类型:', apiError.constructor.name)
+      console.error('[Coze API] 错误消息:', apiError.message)
+      console.error('[Coze API] 错误堆栈:', apiError.stack)
+      if (apiError.cause) {
+        console.error('[Coze API] 错误原因:', apiError.cause)
+      }
+      if (apiError.code) {
+        console.error('[Coze API] 错误代码:', apiError.code)
+      }
+      console.error('[Coze API] ===========================================')
+      // 发生错误时使用本地回答作为fallback，但同时在响应中包含错误信息用于调试
+      const aiResponse = getEnhancedAIResponse(userMessage)
+      return NextResponse.json({ 
+        response: aiResponse,
+        debug: process.env.NODE_ENV === 'development' ? {
+          error: apiError.message,
+          stack: apiError.stack
+        } : undefined
+      })
+    }
 
   } catch (error) {
-    console.error('AI API Error:', error)
-    // 发生错误时使用本地回答
-    const { message } = await request.json()
+    console.error('Chat API Error:', error)
+    // 发生严重错误时使用本地回答
     return NextResponse.json({ 
-      response: getLocalAIResponse(message)
-    })
+      error: '处理请求时发生错误',
+      response: '抱歉，服务暂时不可用，请稍后重试。'
+    }, { status: 500 })
   }
 }
 
