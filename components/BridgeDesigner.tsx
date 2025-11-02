@@ -317,7 +317,7 @@ export default function BridgeDesigner() {
               <Plus className="w-8 h-8 text-gray-400" />
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">还没有桥梁设计</h3>
-            <p className="text-gray-500 mb-4">点击"新建设计"开始您的第一个桥梁设计</p>
+            <p className="text-gray-500 mb-4">点击&quot;新建设计&quot;开始您的第一个桥梁设计</p>
             <button
               onClick={() => setIsCreating(true)}
               className="btn-primary"
