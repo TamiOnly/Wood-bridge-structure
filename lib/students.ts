@@ -1,5 +1,4 @@
 import { getDb, ensureDatabaseInitialized } from './db'
-import { SQLiteAdapter } from './db-sqlite'
 
 export interface Student {
   id: number
@@ -347,22 +346,32 @@ export async function getStudentStats() {
 
 // 为了向后兼容，提供同步版本的函数（仅SQLite）
 // 这些函数仅在SQLite模式下可用，用于脚本
+// 注意：在 Vercel 等生产环境中不会使用此函数
 export function addStudentSync(data: CreateStudentData): Student {
+  // 动态检查是否是 SQLite 适配器，避免静态导入
   const db = getDb()
-  if (!(db instanceof SQLiteAdapter)) {
+  const dbType = db.constructor.name
+  if (dbType !== 'SQLiteAdapter') {
     throw new Error('同步函数仅支持SQLite数据库')
   }
   
+  // 使用类型断言访问 SQLite 特有的方法
+  // 这些方法在 DatabaseAdapter 接口中没有定义
+  const sqliteDb = db as any
+  if (!sqliteDb.transaction || !sqliteDb.queryOneSync) {
+    throw new Error('SQLite 同步方法不可用')
+  }
+  
   // 使用SQLite的事务方法
-  return db.transaction(() => {
+  return sqliteDb.transaction(() => {
     // 实现同步逻辑（保持原有逻辑）
-    const existing = db.queryOneSync('SELECT * FROM students WHERE studentId = ?', [data.studentId])
+    const existing = sqliteDb.queryOneSync('SELECT * FROM students WHERE studentId = ?', [data.studentId])
     if (existing) {
       throw new Error('该学号已存在')
     }
     
     // ... 其他同步逻辑
     // 注意：这里需要实现同步版本，但为了简化，建议脚本也使用异步方式
-    throw new Error('请使用异步版本的函数')
+    throw new Error('请使用异步版本的函数 addStudent')
   })
 }

@@ -60,8 +60,9 @@ export async function GET(request: NextRequest) {
     // 检查3: 表是否存在
     try {
       const db = getDb()
+      const currentDbType = process.env.DB_TYPE || 'sqlite'
       const tables = await db.queryAll<any>(
-        dbType === 'mysql' 
+        currentDbType === 'mysql' 
           ? "SHOW TABLES LIKE 'students'"
           : "SELECT name FROM sqlite_master WHERE type='table' AND name='students'"
       )

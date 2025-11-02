@@ -1,5 +1,4 @@
 import { getDatabaseConfig } from './db-config'
-import { SQLiteAdapter } from './db-sqlite'
 import { MySQLAdapter } from './db-mysql'
 import { DatabaseAdapter } from './db-adapter'
 
@@ -17,9 +16,21 @@ export function initDatabaseAdapter(): DatabaseAdapter {
     console.log('使用 MySQL 数据库')
     dbAdapter = new MySQLAdapter(config.mysql)
   } else {
+    // 动态导入 SQLite 适配器，避免在 Vercel 构建时加载 native 模块
     console.log('使用 SQLite 数据库')
-    const sqlitePath = config.sqlite?.path || './data/students.db'
-    dbAdapter = new SQLiteAdapter(sqlitePath)
+    try {
+      // 使用动态导入，只在需要时加载 SQLite
+      const { SQLiteAdapter } = require('./db-sqlite')
+      const sqlitePath = config.sqlite?.path || './data/students.db'
+      dbAdapter = new SQLiteAdapter(sqlitePath)
+    } catch (error: any) {
+      console.error('SQLite 初始化失败:', error.message)
+      throw new Error('SQLite 数据库初始化失败。在生产环境请使用 MySQL 数据库。')
+    }
+  }
+
+  if (!dbAdapter) {
+    throw new Error('数据库适配器初始化失败')
   }
 
   return dbAdapter
