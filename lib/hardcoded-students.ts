@@ -128,14 +128,27 @@ export function verifyLeaderLoginHardcoded(
   groupName: string,
   password: string
 ): HardcodedStudent | null {
-  // 查找匹配的组长
+  // 去除首尾空格
+  const trimmedName = (name || '').trim()
+  const trimmedGroupName = (groupName || '').trim()
+  const trimmedPassword = (password || '').trim()
+  
+  // 查找匹配的组长（精确匹配，区分大小写）
   const leader = HARDCODED_LEADERS.find(
     (l) =>
-      l.name === name &&
-      l.groupName === groupName &&
+      l.name.trim() === trimmedName &&
+      l.groupName.trim() === trimmedGroupName &&
       l.role === '组长' &&
-      l.groupPassword === password
+      l.groupPassword.trim() === trimmedPassword
   )
+
+  if (!leader) {
+    // 调试日志：记录匹配失败的原因
+    console.log('[Hardcoded Auth] 验证失败:', {
+      input: { name: trimmedName, groupName: trimmedGroupName, passwordLength: trimmedPassword.length },
+      availableLeaders: HARDCODED_LEADERS.map(l => ({ name: l.name, groupName: l.groupName }))
+    })
+  }
 
   return leader || null
 }

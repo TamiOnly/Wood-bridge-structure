@@ -5,7 +5,20 @@ import { ensureDatabaseInitialized } from '@/lib/db'
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, groupName, password } = await request.json()
+    // 解析请求体
+    let name: string, groupName: string, password: string
+    try {
+      const body = await request.json()
+      name = body.name
+      groupName = body.groupName
+      password = body.password
+    } catch (parseError: any) {
+      console.error('[Login] JSON解析错误:', parseError)
+      return NextResponse.json(
+        { error: '请求数据格式错误' },
+        { status: 400 }
+      )
+    }
 
     if (!name || !groupName || !password) {
       return NextResponse.json(
@@ -14,25 +27,37 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('[Login] 开始验证登录信息:', { name, groupName, passwordLength: password?.length })
+    console.log('[Login] 开始验证登录信息:', { 
+      name, 
+      groupName, 
+      passwordLength: password?.length,
+      passwordPreview: password?.substring(0, 2) + '...'
+    })
 
     // 优先使用硬编码验证（不依赖数据库，适用于 Vercel 等无数据库环境）
-    const hardcodedStudent = verifyLeaderLoginHardcoded(name, groupName, password)
-    
-    if (hardcodedStudent) {
-      console.log('[Login] 登录成功（硬编码验证）:', { 
-        studentId: hardcodedStudent.id, 
-        name: hardcodedStudent.name, 
-        groupName: hardcodedStudent.groupName 
-      })
+    try {
+      const hardcodedStudent = verifyLeaderLoginHardcoded(name, groupName, password)
+      
+      if (hardcodedStudent) {
+        console.log('[Login] 登录成功（硬编码验证）:', { 
+          studentId: hardcodedStudent.id, 
+          name: hardcodedStudent.name, 
+          groupName: hardcodedStudent.groupName 
+        })
 
-      // 返回学生信息（不包含密码）
-      const { groupPassword, ...studentWithoutPassword } = hardcodedStudent
+        // 返回学生信息（不包含密码）
+        const { groupPassword, ...studentWithoutPassword } = hardcodedStudent
 
-      return NextResponse.json({
-        success: true,
-        student: studentWithoutPassword,
-      })
+        return NextResponse.json({
+          success: true,
+          student: studentWithoutPassword,
+        })
+      } else {
+        console.log('[Login] 硬编码验证失败，未找到匹配的组长')
+      }
+    } catch (hardcodedError: any) {
+      console.error('[Login] 硬编码验证异常:', hardcodedError)
+      // 继续尝试数据库验证
     }
 
     // 如果硬编码验证失败，尝试数据库验证（用于本地开发或有数据库的环境）
@@ -54,10 +79,15 @@ export async function POST(request: NextRequest) {
           success: true,
           student: studentWithoutPassword,
         })
+      } else {
+        console.log('[Login] 数据库验证失败，未找到匹配的组长')
       }
     } catch (dbError: any) {
       // 数据库验证失败，但这不是致命错误，因为我们优先使用硬编码
-      console.warn('[Login] 数据库验证失败（非致命错误）:', dbError?.message)
+      console.warn('[Login] 数据库验证异常（非致命错误）:', {
+        message: dbError?.message,
+        code: dbError?.code
+      })
     }
 
     // 两种验证方式都失败
@@ -67,7 +97,11 @@ export async function POST(request: NextRequest) {
       { status: 401 }
     )
   } catch (error: any) {
-    console.error('Login error:', error)
+    console.error('[Login] 未预期的错误:', {
+      message: error?.message,
+      stack: error?.stack,
+      name: error?.name
+    })
     return NextResponse.json(
       { 
         error: '登录时发生错误，请稍后重试',
