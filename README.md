@@ -182,19 +182,57 @@ const getEnhancedAIResponse = (message: string): string => {
 - 学习进度记录
 - 聊天历史
 
-## 🚀 部署建议
+## 🚀 部署指南
 
 ### Vercel 部署（推荐）
 
-1. 将代码推送到 GitHub
-2. 在 Vercel 中导入项目
-3. 自动部署完成
+⚠️ **重要提示**: Vercel 是无服务器环境，文件系统是只读的，因此 **必须使用 MySQL 数据库**，不能使用 SQLite。
+
+#### 快速部署步骤
+
+1. **准备 MySQL 数据库**
+   - 使用 [PlanetScale](https://planetscale.com/)、[Supabase](https://supabase.com/) 或其他 MySQL 托管服务
+   - 创建数据库并获取连接信息
+
+2. **部署到 Vercel**
+   - 将代码推送到 GitHub
+   - 在 [Vercel](https://vercel.com/) 中导入项目
+   - 配置环境变量（见下方）
+
+3. **配置环境变量**
+   
+   在 Vercel 项目设置中添加以下环境变量：
+   
+   ```env
+   # 数据库配置（必须使用 MySQL）
+   DB_TYPE=mysql
+   DB_HOST=你的MySQL主机地址
+   DB_PORT=3306
+   DB_USER=你的MySQL用户名
+   DB_PASSWORD=你的MySQL密码
+   DB_NAME=你的数据库名
+   
+   # Coze AI 配置（可选）
+   COZE_API_KEY=你的扣子API密钥
+   COZE_BOT_ID=你的Bot ID
+   ```
+
+4. **初始化数据库**
+   - 首次部署后，访问应用会自动创建数据库表
+   - 或使用 MySQL 客户端手动创建表结构
+
+5. **导入学生数据**
+   - 使用批量导入 API 或直接连接数据库插入数据
+
+📖 **详细部署指南**: 请查看 [Vercel部署指南](docs/Vercel部署指南.md)
 
 ### 其他平台
 
 - **Netlify**：支持静态站点部署
 - **Railway**：支持全栈应用部署
 - **自建服务器**：使用 PM2 管理进程
+
+⚠️ **注意**: 所有生产环境都建议使用 MySQL 数据库。
 
 ## 🤝 贡献指南
 
