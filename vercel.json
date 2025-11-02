@@ -1,9 +1,4 @@
 {
-  "version": 2,
-  "name": "magic-wood-structure",
-  "env": {
-    "NODE_ENV": "production"
-  },
   "functions": {
     "app/api/chat/route.ts": {
       "maxDuration": 30
