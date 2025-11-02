@@ -48,8 +48,12 @@ CREATE TABLE IF NOT EXISTS students (
 #### 选项 B: 使用命令行
 
 ```bash
-mysql -h <Railway的MYSQLHOST> -P 3306 -u <Railway的MYSQLUSER> -p<RYSQLPASSWORD> <Railway的MYSQLDATABASE>
+mysql -h <Railway的MYSQLHOST> -P 3306 -u <Railway的MYSQLUSER> -p<MYSQLPASSWORD> <Railway的MYSQLDATABASE>
 ```
+
+⚠️ **注意**: 
+- `-p` 和密码之间**不能有空格**
+- 或者使用 `-p` 不跟密码，系统会提示你输入密码（更安全）
 
 然后在 MySQL 命令行中执行上面的 SQL。
 
