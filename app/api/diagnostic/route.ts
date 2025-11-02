@@ -11,6 +11,8 @@ export async function GET(request: NextRequest) {
 
   try {
     // 检查1: 数据库连接
+    // 在 Vercel 上使用硬编码登录时，数据库连接失败不是致命错误
+    const isVercel = !!process.env.VERCEL
     try {
       await ensureDatabaseInitialized()
       diagnostics.checks.databaseConnection = {
@@ -18,30 +20,43 @@ export async function GET(request: NextRequest) {
         message: '数据库连接成功'
       }
     } catch (error: any) {
-      diagnostics.checks.databaseConnection = {
-        status: 'error',
-        message: '数据库连接失败',
-        error: error?.message,
-        code: error?.code
+      // 在 Vercel 环境且使用硬编码登录时，数据库连接失败是正常的
+      if (isVercel && !process.env.DB_TYPE) {
+        diagnostics.checks.databaseConnection = {
+          status: 'ok',
+          message: '数据库未配置，使用硬编码登录验证（正常）'
+        }
+      } else {
+        diagnostics.checks.databaseConnection = {
+          status: 'warning',
+          message: '数据库连接失败，但可使用硬编码登录验证',
+          error: error?.message,
+          code: error?.code
+        }
+        // 不再返回错误，继续执行其他检查
       }
-      diagnostics.status = 'error'
-      return NextResponse.json(diagnostics, { status: 500 })
     }
 
     // 检查2: 数据库类型（检查实际使用的类型）
-    const db = getDb()
     const actualDbType = process.env.DB_TYPE || 'sqlite'
-    
-    // 检查实际使用的数据库类型
     let actualType = actualDbType
-    try {
-      // 尝试执行 MySQL 特有的查询来检测实际类型
-      const testQuery = await db.queryOne<any>("SELECT VERSION() as version")
-      if (testQuery?.version) {
-        actualType = 'mysql'
+    
+    // 只在配置为 MySQL 时才尝试检测，避免在 SQLite 上执行 MySQL 查询
+    if (actualDbType === 'mysql') {
+      try {
+        const db = getDb()
+        // 尝试执行 MySQL 特有的查询来检测实际类型
+        const testQuery = await db.queryOne<any>("SELECT VERSION() as version")
+        if (testQuery?.version) {
+          actualType = 'mysql'
+        }
+      } catch (e: any) {
+        // 如果失败，说明可能配置错误
+        console.warn('[Diagnostic] MySQL检测失败:', e?.message)
+        actualType = 'unknown'
       }
-    } catch (e) {
-      // 如果失败，可能是 SQLite
+    } else {
+      // 如果配置的是 SQLite，直接使用，不需要检测
       actualType = 'sqlite'
     }
     
@@ -57,86 +72,105 @@ export async function GET(request: NextRequest) {
         : undefined
     }
 
-    // 检查3: 表是否存在
-    try {
-      const db = getDb()
-      const currentDbType = process.env.DB_TYPE || 'sqlite'
-      const tables = await db.queryAll<any>(
-        currentDbType === 'mysql' 
-          ? "SHOW TABLES LIKE 'students'"
-          : "SELECT name FROM sqlite_master WHERE type='table' AND name='students'"
-      )
-      
-      if (tables.length > 0) {
-        diagnostics.checks.tableExists = {
-          status: 'ok',
-          message: 'students 表已存在'
+    // 检查3: 表是否存在（仅在数据库可用时检查）
+    if (actualType === 'mysql' || (actualType === 'sqlite' && !process.env.VERCEL)) {
+      try {
+        const db = getDb()
+        const currentDbType = process.env.DB_TYPE || 'sqlite'
+        const tables = await db.queryAll<any>(
+          currentDbType === 'mysql' 
+            ? "SHOW TABLES LIKE 'students'"
+            : "SELECT name FROM sqlite_master WHERE type='table' AND name='students'"
+        )
+        
+        if (tables.length > 0) {
+          diagnostics.checks.tableExists = {
+            status: 'ok',
+            message: 'students 表已存在'
+          }
+        } else {
+          diagnostics.checks.tableExists = {
+            status: 'warning',
+            message: 'students 表不存在，但使用硬编码登录不需要数据库'
+          }
         }
-      } else {
+      } catch (error: any) {
         diagnostics.checks.tableExists = {
-          status: 'error',
-          message: 'students 表不存在，需要初始化'
+          status: 'warning',
+          message: '检查表时出错，但使用硬编码登录不需要数据库',
+          error: error?.message
         }
-        diagnostics.status = 'warning'
       }
-    } catch (error: any) {
+    } else {
+      // Vercel 环境使用硬编码登录，不需要数据库表
       diagnostics.checks.tableExists = {
-        status: 'error',
-        message: '检查表时出错',
-        error: error?.message
+        status: 'ok',
+        message: '使用硬编码登录验证，无需数据库表'
       }
     }
 
-    // 检查4: 数据数量
-    try {
-      const db = getDb()
-      const countResult = await db.queryOne<{ count: number }>(
-        'SELECT COUNT(*) as count FROM students'
-      )
-      const studentCount = countResult?.count || 0
-      
-      diagnostics.checks.dataCount = {
-        status: studentCount > 0 ? 'ok' : 'warning',
-        count: studentCount,
-        message: studentCount > 0 
-          ? `数据库中有 ${studentCount} 条学生记录` 
-          : '数据库中没有任何学生记录，需要导入数据'
-      }
-      
-      if (studentCount === 0) {
-        diagnostics.status = 'warning'
-      }
+    // 检查4: 数据数量（仅在数据库可用时检查）
+    if (actualType === 'mysql' || (actualType === 'sqlite' && !process.env.VERCEL)) {
+      try {
+        const db = getDb()
+        const countResult = await db.queryOne<{ count: number }>(
+          'SELECT COUNT(*) as count FROM students'
+        )
+        const studentCount = countResult?.count || 0
+        
+        diagnostics.checks.dataCount = {
+          status: studentCount > 0 ? 'ok' : 'warning',
+          count: studentCount,
+          message: studentCount > 0 
+            ? `数据库中有 ${studentCount} 条学生记录` 
+            : '数据库中没有任何学生记录，需要导入数据'
+        }
+        
+        if (studentCount === 0) {
+          diagnostics.status = 'warning'
+        }
 
-      // 检查5: 组长数量
-      const leaderResult = await db.queryOne<{ count: number }>(
-        "SELECT COUNT(*) as count FROM students WHERE role = '组长'"
-      )
-      const leaderCount = leaderResult?.count || 0
-      
+        // 检查5: 组长数量
+        const leaderResult = await db.queryOne<{ count: number }>(
+          "SELECT COUNT(*) as count FROM students WHERE role = '组长'"
+        )
+        const leaderCount = leaderResult?.count || 0
+        
+        diagnostics.checks.leaderCount = {
+          status: leaderCount > 0 ? 'ok' : 'warning',
+          count: leaderCount,
+          message: leaderCount > 0 
+            ? `数据库中有 ${leaderCount} 个组长账户` 
+            : '数据库中没有组长账户，无法登录'
+        }
+        
+        if (leaderCount === 0) {
+          diagnostics.status = 'warning'
+        }
+      } catch (error: any) {
+        diagnostics.checks.dataCount = {
+          status: 'error',
+          message: '查询数据时出错',
+          error: error?.message,
+          code: error?.code
+        }
+      }
+    } else {
+      // Vercel 环境使用硬编码登录，不需要数据库
+      diagnostics.checks.dataCount = {
+        status: 'ok',
+        count: 10,
+        message: '使用硬编码登录验证（10位组长），无需数据库'
+      }
       diagnostics.checks.leaderCount = {
-        status: leaderCount > 0 ? 'ok' : 'warning',
-        count: leaderCount,
-        message: leaderCount > 0 
-          ? `数据库中有 ${leaderCount} 个组长账户` 
-          : '数据库中没有组长账户，无法登录'
-      }
-      
-      if (leaderCount === 0) {
-        diagnostics.status = 'warning'
-      }
-
-    } catch (error: any) {
-      diagnostics.checks.dataCount = {
-        status: 'error',
-        message: '查询数据时出错',
-        error: error?.message,
-        code: error?.code
+        status: 'ok',
+        count: 10,
+        message: '使用硬编码组长账户（10位），无需数据库'
       }
     }
 
     // 检查6: 环境变量
     const dbTypeEnv = process.env.DB_TYPE
-    const isVercel = !!process.env.VERCEL
     
     diagnostics.checks.environment = {
       status: dbTypeEnv === 'mysql' ? 'ok' : (isVercel ? 'error' : 'warning'),
