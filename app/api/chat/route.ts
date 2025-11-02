@@ -14,9 +14,21 @@ export async function POST(request: NextRequest) {
     
     if (!cozeApiKey || !cozeBotId) {
       // 如果没有配置API key，使用本地增强的智能回答系统作为fallback
-      console.warn('COZE_API_KEY or COZE_BOT_ID not configured, using local AI response system')
+      const isVercel = !!process.env.VERCEL
+      const missingVar = !cozeApiKey ? 'COZE_API_KEY' : 'COZE_BOT_ID'
+      
+      console.warn(`[Coze API] ${missingVar} not configured, using local AI response system`)
+      if (isVercel) {
+        console.warn(`[Coze API] ⚠️ Vercel 部署：请在 Vercel 项目设置中添加环境变量 ${missingVar}`)
+      }
+      
       const aiResponse = getEnhancedAIResponse(userMessage)
-      return NextResponse.json({ response: aiResponse })
+      return NextResponse.json({ 
+        response: aiResponse,
+        warning: isVercel 
+          ? `智能体未配置：缺少 ${missingVar}。请在 Vercel 项目设置中添加环境变量。访问 /api/diagnostic 查看详细配置说明。`
+          : undefined
+      })
     }
 
     try {

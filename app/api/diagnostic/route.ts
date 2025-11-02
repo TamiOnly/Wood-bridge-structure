@@ -169,7 +169,28 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 检查6: 环境变量
+    // 检查6: Coze API 配置（智能体）
+    const hasCozeApiKey = !!process.env.COZE_API_KEY
+    const hasCozeBotId = !!process.env.COZE_BOT_ID
+    const cozeConfigured = hasCozeApiKey && hasCozeBotId
+    
+    diagnostics.checks.cozeApi = {
+      status: cozeConfigured ? 'ok' : 'error',
+      hasApiKey: hasCozeApiKey,
+      hasBotId: hasCozeBotId,
+      message: cozeConfigured
+        ? '✅ Coze API 配置正常，智能体可用'
+        : !hasCozeApiKey && !hasCozeBotId
+        ? '❌ Coze API 未配置：缺少 COZE_API_KEY 和 COZE_BOT_ID。请在 Vercel 项目设置中添加这些环境变量。参考：docs/Vercel智能体配置指南.md'
+        : !hasCozeApiKey
+        ? '❌ Coze API 未配置：缺少 COZE_API_KEY。请在 Vercel 项目设置中添加此环境变量。'
+        : '❌ Coze API 未配置：缺少 COZE_BOT_ID。请在 Vercel 项目设置中添加此环境变量。',
+      configGuide: isVercel && !cozeConfigured
+        ? '配置步骤：Vercel Dashboard → 项目 → Settings → Environment Variables → 添加 COZE_API_KEY 和 COZE_BOT_ID → 重新部署'
+        : undefined
+    }
+
+    // 检查7: 数据库环境变量
     const dbTypeEnv = process.env.DB_TYPE
     
     diagnostics.checks.environment = {
@@ -180,8 +201,8 @@ export async function GET(request: NextRequest) {
       dbName: process.env.DB_NAME || '❌ 未设置',
       hasDbUser: !!process.env.DB_USER,
       hasDbPassword: !!process.env.DB_PASSWORD,
-      hasCozeApiKey: !!process.env.COZE_API_KEY,
-      hasCozeBotId: !!process.env.COZE_BOT_ID,
+      hasCozeApiKey: hasCozeApiKey,
+      hasCozeBotId: hasCozeBotId,
       message: !dbTypeEnv && isVercel
         ? '❌ 严重错误：Vercel 环境中 DB_TYPE 未设置！请立即在 Vercel 项目设置中添加环境变量 DB_TYPE=mysql'
         : dbTypeEnv === 'sqlite' && isVercel
