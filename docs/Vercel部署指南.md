@@ -10,12 +10,15 @@
 
 1. Vercel 账号
 2. MySQL 数据库（可以使用以下服务之一）：
-   - [PlanetScale](https://planetscale.com/)（推荐，免费套餐可用）
-   - [Supabase](https://supabase.com/)
-   - [Railway](https://railway.app/)
-   - [Aiven](https://aiven.io/)
+   - [Railway](https://railway.app/)（推荐，免费额度 $5/月）
+   - [Render](https://render.com/)（免费套餐可用）
+   - [Aiven](https://aiven.io/)（免费试用）
+   - [Free MySQL Hosting](https://www.freemysqlhosting.net/)（免费 MySQL 托管）
+   - [db4free.net](https://www.db4free.net/)（免费 MySQL 数据库）
    - 或其他 MySQL 托管服务
    - 自建 MySQL 服务器（需要有公网IP）
+
+⚠️ **注意**: PlanetScale 已取消免费套餐。如果需要免费 MySQL 数据库，建议使用上述替代方案。
 
 ## 部署步骤
 
@@ -23,21 +26,47 @@
 
 选择一个 MySQL 托管服务并创建数据库：
 
-#### 使用 PlanetScale（推荐）
+#### 方案 A: 使用 Railway（推荐，免费额度 $5/月）
 
-1. 访问 [PlanetScale](https://planetscale.com/) 并注册账号
-2. 创建新数据库
-3. 获取连接信息：
-   - Host（主机）
-   - Port（端口，通常是 3306）
-   - Username（用户名）
-   - Password（密码）
-   - Database name（数据库名）
+1. 访问 [Railway](https://railway.app/) 并注册账号（使用 GitHub 账号登录）
+2. 创建新项目
+3. 点击 **"New"** → 选择 **"Database"** → 选择 **"MySQL"**
+4. Railway 会自动创建 MySQL 数据库
+5. 点击 MySQL 服务卡片
+6. 在 **Variables** 标签中查看连接信息：
+   - `MYSQLHOST` → 这是 **DB_HOST**
+   - `MYSQLPORT` → 这是 **DB_PORT**（通常是 3306）
+   - `MYSQLUSER` → 这是 **DB_USER**
+   - `MYSQLPASSWORD` → 这是 **DB_PASSWORD**
+   - `MYSQLDATABASE` → 这是 **DB_NAME**
 
-#### 使用 Supabase
+#### 方案 B: 使用 Render（免费套餐）
 
-1. 访问 [Supabase](https://supabase.com/) 并创建项目
-2. 在项目设置中获取数据库连接信息
+1. 访问 [Render](https://render.com/) 并注册账号
+2. 点击 **"New +"** → 选择 **"PostgreSQL"** 或 **"MySQL"**（如果可用）
+3. 创建免费数据库实例
+4. 在数据库详情页查看连接信息：
+   - **Host** → DB_HOST
+   - **Port** → DB_PORT
+   - **Database** → DB_NAME
+   - **User** → DB_USER
+   - **Password** → DB_PASSWORD
+
+#### 方案 C: 使用 db4free.net（完全免费）
+
+1. 访问 [db4free.net](https://www.db4free.net/)
+2. 点击 **"Sign up"** 注册账号
+3. 创建新数据库
+4. 获取连接信息（在注册确认邮件中）
+   - **Host**: 通常是 `db4free.net`
+   - **Port**: `3306`
+   - 用户名、密码和数据库名在注册时设置
+
+#### 方案 D: 使用其他服务
+
+1. 访问服务的官网并注册账号
+2. 创建 MySQL 数据库
+3. 在服务控制台中查找连接信息（通常在 "Connection" 或 "Settings" 页面）
 
 ### 2. 在 Vercel 中部署项目
 

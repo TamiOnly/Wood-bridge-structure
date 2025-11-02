@@ -2,9 +2,46 @@
 
 根据你使用的 MySQL 服务，获取连接信息的方法不同。以下是常见服务的详细说明：
 
-## 🔍 方法 1: PlanetScale（推荐）
+## 🔍 方法 1: Railway（推荐，免费额度 $5/月）
 
-PlanetScale 是一个流行的 MySQL 托管服务，提供免费套餐。
+Railway 提供每月 $5 的免费额度，非常适合小型项目。
+
+### 获取连接信息：
+
+1. **登录 Railway**
+   - 访问 [https://railway.app](https://railway.app)
+   - 使用 GitHub 账号登录
+
+2. **创建 MySQL 数据库**
+   - 在项目中点击 **"New"** → **"Database"** → **"MySQL"**
+   - Railway 会自动创建并配置 MySQL 数据库
+
+3. **获取连接信息**
+   - 点击 MySQL 服务卡片
+   - 切换到 **Variables**（变量）标签
+   - 你会看到以下变量：
+     - `MYSQLHOST` → 这是 **DB_HOST**
+     - `MYSQLPORT` → 这是 **DB_PORT**（通常是 3306）
+     - `MYSQLUSER` → 这是 **DB_USER**
+     - `MYSQLPASSWORD` → 这是 **DB_PASSWORD**
+     - `MYSQLDATABASE` → 这是 **DB_NAME**
+
+### 示例：
+
+从 Variables 中复制这些值到 Vercel 环境变量：
+- **DB_HOST** = `containers-us-west-xxx.railway.app`
+- **DB_PORT** = `3306`
+- **DB_USER** = `root`
+- **DB_PASSWORD** = `xxxxxxxxxxxx`
+- **DB_NAME** = `railway`
+
+---
+
+## 🔍 方法 1.1: PlanetScale（付费服务）
+
+⚠️ **注意**: PlanetScale 已于 2024 年 4 月取消了免费套餐，现在需要付费使用。
+
+如果你已付费使用 PlanetScale：
 
 ### 获取连接信息：
 
@@ -24,30 +61,62 @@ PlanetScale 是一个流行的 MySQL 托管服务，提供免费套餐。
      ```
 
 4. **提取信息**
-   从连接字符串中提取：
-   - **DB_HOST**: 主机地址（例如：`aws.connect.psdb.cloud`）
-   - **DB_PORT**: `3306`
-   - **DB_USER**: 用户名
-   - **DB_PASSWORD**: 密码（点击显示）
-   - **DB_NAME**: 数据库名
-
-### 示例：
-
-如果连接字符串是：
-```
-mysql://abc123:pscale_pw_xxx@aws.connect.psdb.cloud:3306/my_database
-```
-
-那么：
-- **DB_HOST** = `aws.connect.psdb.cloud`
-- **DB_PORT** = `3306`
-- **DB_USER** = `abc123`
-- **DB_PASSWORD** = `pscale_pw_xxx`
-- **DB_NAME** = `my_database`
+   从连接字符串中提取各部分信息
 
 ---
 
-## 🔍 方法 2: Supabase
+## 🔍 方法 2: Render（免费套餐）
+
+Render 提供免费的 PostgreSQL 和 MySQL 数据库（有限制）。
+
+### 获取连接信息：
+
+1. **登录 Render**
+   - 访问 [https://render.com](https://render.com)
+   - 注册账号
+
+2. **创建数据库**
+   - 点击 **"New +"** → **"PostgreSQL"** 或 **"MySQL"**
+   - 选择免费套餐（如果可用）
+
+3. **获取连接信息**
+   - 在数据库详情页面
+   - 查看 **Connection Info** 部分：
+     - **Host** → DB_HOST
+     - **Port** → DB_PORT
+     - **Database** → DB_NAME
+     - **User** → DB_USER
+     - **Password** → DB_PASSWORD
+
+---
+
+## 🔍 方法 2.1: db4free.net（完全免费）
+
+db4free.net 提供完全免费的 MySQL 数据库（适合测试和学习）。
+
+### 获取连接信息：
+
+1. **注册账号**
+   - 访问 [https://www.db4free.net](https://www.db4free.net)
+   - 点击 **"Sign up"** 注册
+
+2. **创建数据库**
+   - 登录后创建新数据库
+   - 设置数据库名、用户名和密码
+
+3. **获取连接信息**
+   - 连接信息通常为：
+     - **DB_HOST** = `db4free.net`
+     - **DB_PORT** = `3306`
+     - **DB_USER** = 你注册的用户名
+     - **DB_PASSWORD** = 你设置的密码
+     - **DB_NAME** = 你创建的数据库名
+
+⚠️ **注意**: db4free.net 是免费服务，可能有性能和稳定性限制，适合测试和小型项目。
+
+---
+
+## 🔍 方法 2.2: Supabase
 
 Supabase 提供 PostgreSQL，但也支持 MySQL（通过 Supabase for MySQL 或自建）。
 
@@ -288,16 +357,17 @@ node test-connection.js
 
 ## 🎯 快速查找表
 
-| 服务 | 主机地址在哪里找 |
-|------|----------------|
-| **PlanetScale** | Connect 按钮 → MySQL 连接字符串 |
-| **Supabase** | Settings → Database → Connection string |
-| **Railway** | Service → Variables → MYSQLHOST |
-| **Azure** | MySQL Server → Overview → Server name |
-| **AWS RDS** | RDS Console → Database → Endpoint |
-| **Render** | Service → Info → Hostname |
-| **DigitalOcean** | Databases → Connection Details → Host |
-| **自建服务器** | 服务器的公网 IP 或域名 |
+| 服务 | 主机地址在哪里找 | 免费套餐 |
+|------|----------------|---------|
+| **Railway** | Service → Variables → MYSQLHOST | ✅ $5/月免费额度 |
+| **Render** | Service → Info → Hostname | ✅ 免费套餐可用 |
+| **db4free.net** | 固定为 `db4free.net` | ✅ 完全免费 |
+| **Supabase** | Settings → Database → Connection string | ✅ 免费套餐（PostgreSQL） |
+| **PlanetScale** | Connect 按钮 → MySQL 连接字符串 | ❌ 已取消免费套餐 |
+| **Azure** | MySQL Server → Overview → Server name | ❌ 付费 |
+| **AWS RDS** | RDS Console → Database → Endpoint | ❌ 付费 |
+| **DigitalOcean** | Databases → Connection Details → Host | ❌ 付费 |
+| **自建服务器** | 服务器的公网 IP 或域名 | - |
 
 ---
 
